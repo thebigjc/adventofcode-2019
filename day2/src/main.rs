@@ -4,13 +4,12 @@ fn parse(s: &str) -> usize {
     s.trim().parse().unwrap()
 }
 
-fn main() {
-    let mut tokens:Vec<usize> = fs::read_to_string("day2.txt").unwrap().split(",").map(parse).collect();
-
+fn intcode(input: &Vec<usize>, a: usize, b: usize) -> usize {
     let mut i = 0;
+    let mut tokens = input.to_vec();
 
-    tokens[1] = 12;
-    tokens[2] = 2;
+    tokens[1] = a;
+    tokens[2] = b;
 
     loop {
         match tokens[i] {
@@ -29,7 +28,6 @@ fn main() {
                 i += 4;
             }
             99 => {
-                println!("99");
                 break;
             }
             _ => {
@@ -38,5 +36,22 @@ fn main() {
         }
     }
 
-    println!("{}", tokens[0]);
+    tokens[0]
+}
+
+fn main() {
+    let tokens:Vec<usize> = fs::read_to_string("day2.txt").unwrap().split(",").map(parse).collect();
+    let ret = intcode(&tokens, 12, 2);
+
+    println!("{}", ret);
+
+    for a in 0..99 {
+        for b in 0..99 {
+            let ret = intcode(&tokens, a, b);
+            if ret == 19690720 {
+                println!("100 * {} + {} = {}", a, b, 100*a+b);
+                break;
+            }
+        }
+    }
 }
