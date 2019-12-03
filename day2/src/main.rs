@@ -45,8 +45,8 @@ fn main() {
 
     println!("{}", ret);
 
-    for a in 0..99 {
-        for b in 0..99 {
+    for a in 0..=99 {
+        for b in 0..=99 {
             let ret = intcode(&tokens, a, b);
             if ret == 19690720 {
                 println!("100 * {} + {} = {}", a, b, 100*a+b);
