@@ -1,6 +1,4 @@
-use itertools::Itertools;
 use png;
-use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::BufWriter;
@@ -17,22 +15,10 @@ fn parse(c: char) -> u8 {
 }
 
 fn one(chunks: &Vec<&[u8]>) -> usize {
-    let zeros: Vec<usize> = chunks
-        .iter()
-        .map(|x| x.iter().filter(|y| **y == 0).count())
-        .collect();
-    let (_min_zeros, min_chunk) = zeros.iter().zip(chunks).min_by_key(|(x, _)| *x).unwrap();
-    let mut min_chunk = min_chunk.to_vec();
-    min_chunk.sort();
+    let min_chunk = (*chunks.iter().min_by_key(|x| x.iter().filter(|a| **a == 0).count()).unwrap()).to_vec();
 
-    let mut m = HashMap::new();
-
-    for (k, g) in &min_chunk.into_iter().group_by(|x| *x) {
-        m.insert(k, g.count());
-    }
-
-    let one = *(m.get(&1).unwrap());
-    let two = *(m.get(&2).unwrap());
+    let one = min_chunk.iter().filter(|x| **x == 1).count();
+    let two = min_chunk.iter().filter(|x| **x == 2).count();
     one * two
 }
 
@@ -41,21 +27,12 @@ fn two(layers: &Vec<&[u8]>, size: usize) -> Vec<u8> {
 
     for l in layers {
         for (i, b) in (0..size).zip(l.iter()) {
-            let a = output[i];
+            let mut a = output[i];
+            if a == 2 {
+                a = *b;
+            }
 
-            let o = match (a, b) {
-                (0, 0) => 0,
-                (0, 1) => 0,
-                (0, 2) => 0,
-                (1, 0) => 1,
-                (1, 1) => 1,
-                (1, 2) => 1,
-                (2, 0) => 0,
-                (2, 1) => 1,
-                (2, 2) => 2,
-                _ => panic!("Unknown pair"),
-            };
-            output[i] = o
+            output[i] = a
         }
     }
 
