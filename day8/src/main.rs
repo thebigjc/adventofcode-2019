@@ -75,7 +75,6 @@ fn main() {
 
     let layers: Vec<&[u8]> = nums
         .chunks(width * height)
-        .filter(|x| x.len() == width * height)
         .collect();
 
     let ret = one(&layers);
