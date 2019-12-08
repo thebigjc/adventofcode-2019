@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use std::fs;
 use std::i32;
+use std::collections::VecDeque;
 
 fn parse(s: &str) -> i32 {
     s.trim().parse().unwrap()
@@ -25,6 +26,7 @@ fn mode(m: i32) -> fn(&Vec<i32>, usize) -> i32 {
 struct Program {
     orig: Vec<i32>,
     tokens: Vec<i32>,
+    inputs: VecDeque<i32>,
     output: i32,
     i: usize,
     halted: bool,
@@ -35,6 +37,7 @@ impl Program {
         Program {
             orig: t.to_vec(),
             tokens: t.to_vec(),
+            inputs: VecDeque::new(),
             output: i32::MIN,
             i: 0,
             halted: false,
@@ -44,6 +47,7 @@ impl Program {
     fn reset(&mut self) {
         self.tokens = self.orig.to_vec();
         self.i = 0;
+        self.inputs = VecDeque::new();
         self.output = i32::MIN;
         self.halted = false;
     }
@@ -92,9 +96,7 @@ impl Program {
         self.i += 4;
     }
 
-    fn intcode(&mut self, input: &Vec<i32>) {
-        let mut inputs = input.to_vec();
-
+    fn intcode(&mut self) {
         loop {
             let t = self.tokens[self.i];
             let opcode = t % 100;
@@ -112,7 +114,7 @@ impl Program {
                 }
                 3 => {
                     let a = self.tokens[self.i + 1] as usize;
-                    self.tokens[a] = inputs.pop().unwrap();
+                    self.tokens[a] = self.inputs.pop_front().unwrap();
                     self.i += 2;
                 }
                 4 => {
@@ -133,7 +135,7 @@ impl Program {
                     self.test(a_mode, b_mode, |a, b| a == b);
                 }
                 99 => {
-                    println!("Halt!");
+                    //println!("Halt!");
                     self.halted = true;
                     return;
                 }
@@ -147,8 +149,11 @@ impl Program {
 
 fn run(programs: &mut Vec<Program>, order: &Vec<i32>) -> i32 {
     programs.iter_mut().for_each(|x|x.reset());
+    for (x,p) in order.iter().zip(programs.iter_mut()) {
+        p.inputs.push_back(*x);
+    }
 
-    println!("Order:{:?}", order);
+    //println!("Order:{:?}", order);
     let mut output = 0;
     let mut i = 0;
     while !programs.iter().any(|x|x.halted) {
@@ -156,16 +161,13 @@ fn run(programs: &mut Vec<Program>, order: &Vec<i32>) -> i32 {
         if i > 10000 {
             panic!("Loops");
         }
-        for (x,p) in order.iter().zip(programs.iter_mut()) {
-            let inputs = vec![output, *x];
-            println!("{:?}", inputs);
-            p.intcode(&inputs);
+        for p in programs.iter_mut() {
+            p.inputs.push_back(output);
+            p.intcode();
             output = p.output;
-            println!("{:?}={}-{}", inputs, output, p.halted);
-            println!("{:?}", p.tokens);
         }
     }
-    println!("Order:{:?}={}", order, output);
+    //println!("Order:{:?}={}", order, output);
     output
 }
 
