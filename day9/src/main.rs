@@ -1,6 +1,8 @@
 use std::fs;
 use std::i128;
 use std::collections::VecDeque;
+use std::collections::HashMap;
+use std::iter::FromIterator;
 
 fn parse(s: &str) -> i128 {
     s.trim().parse().unwrap()
@@ -9,10 +11,10 @@ fn parse(s: &str) -> i128 {
 
 struct Program {
     orig: Vec<i128>,
-    tokens: Vec<i128>,
+    tokens: HashMap<i128, i128>,
     inputs: VecDeque<i128>,
     output: i128,
-    i: usize,
+    i: i128,
     rb: i128,
     halted: bool,
 }
@@ -21,7 +23,7 @@ impl Program {
     fn new(t: &Vec<i128>) -> Program {
         Program {
             orig: t.to_vec(),
-            tokens: t.to_vec(),
+            tokens: HashMap::from_iter(t.iter().enumerate().map(|(a,b)|(a as i128, *b))),
             inputs: VecDeque::new(),
             output: i128::MIN,
             i: 0,
@@ -30,24 +32,24 @@ impl Program {
         }
     }
 
-    fn position(&mut self, o: usize) -> i128 {
-        let i = *self.tokens.get(self.i+o).unwrap_or(&0) as usize;
+    fn position(&mut self, o: i128) -> i128 {
+        let i = *self.tokens.get(&(self.i+o)).unwrap_or(&0); 
          
-        *self.tokens.get(i).unwrap_or(&0)
+        *self.tokens.get(&i).unwrap_or(&0)
     }
 
-    fn immediate(&mut self, o: usize) -> i128 {
-        *self.tokens.get(self.i+o).unwrap_or(&0)
+    fn immediate(&mut self, o: i128) -> i128 {
+        *self.tokens.get(&(self.i+o)).unwrap_or(&0)
     }
 
-    fn relative(&mut self, o: usize) -> i128 {
-        let pos = self.tokens.get(self.i+o).unwrap_or(&0);
-        let i = (self.rb + pos) as usize;
+    fn relative(&mut self, o: i128) -> i128 {
+        let pos = self.tokens.get(&(self.i+o)).unwrap_or(&0);
+        let i = (self.rb + pos) as i128;
          
-        *self.tokens.get(i).unwrap_or(&0)
+        *self.tokens.get(&i).unwrap_or(&0)
     }
 
-    fn mode(&self, m: i128) -> fn(&mut Program, usize) -> i128 {
+    fn mode(&self, m: i128) -> fn(&mut Program, i128) -> i128 {
         match m {
             0 => Program::position,
             1 => Program::immediate,
@@ -56,59 +58,56 @@ impl Program {
         }
     }
 
-    fn reset(&mut self) {
+    /*fn reset(&mut self) {
         self.tokens = self.orig.to_vec();
         self.i = 0;
         self.rb = 0;
         self.inputs = VecDeque::new();
         self.output = i128::MIN;
         self.halted = false;
-    }
+    }*/
 
-    fn store(&mut self, i: usize, x: i128) {
-        if i >= self.tokens.len() {
-            self.tokens.resize(i+1, 0);
-        }
+    fn store(&mut self, i: i128, x: i128) {
         println!("Store: {} = {}", i, x);
-        self.tokens[i] = x;
+        self.tokens.insert(i,x);
     }
 
     fn op(
         &mut self,
-        a_mode: fn(&mut Program, usize) -> i128,
-        b_mode: fn(&mut Program, usize) -> i128,
+        a_mode: fn(&mut Program, i128) -> i128,
+        b_mode: fn(&mut Program, i128) -> i128,
         o: fn(a: i128, b: i128) -> i128,
     ) {
         let a = a_mode(self, 1);
         let b = b_mode(self, 2);
-        let c = self.immediate(3) as usize;
+        let c = self.immediate(3) as i128;
         self.store(c, o(a,b));
         self.i += 4;
     }
 
     fn branch(
         &mut self,
-        a_mode: fn(&mut Program, usize) -> i128,
-        b_mode: fn(&mut Program, usize) -> i128,
+        a_mode: fn(&mut Program, i128) -> i128,
+        b_mode: fn(&mut Program, i128) -> i128,
         o: fn(a: i128) -> bool,
     ) {
         let a = a_mode(self, 1);
         let b = b_mode(self, 2);
         if o(a) {
-            self.i = b as usize;
+            self.i = b as i128;
         } else {
             self.i += 3;
         }
     }
     fn test(
         &mut self,
-        a_mode: fn(&mut Program, usize) -> i128,
-        b_mode: fn(&mut Program, usize) -> i128,
+        a_mode: fn(&mut Program, i128) -> i128,
+        b_mode: fn(&mut Program, i128) -> i128,
         o: fn(a: i128, b: i128) -> bool,
     ) {
         let a = a_mode(self, 1);
         let b = b_mode(self, 2);
-        let c = self.immediate(3) as usize;
+        let c = self.immediate(3) as i128;
         if o(a, b) {
             self.store(c, 1);
         } else {
@@ -119,7 +118,7 @@ impl Program {
 
     fn intcode(&mut self) {
         loop {
-            let t = self.tokens[self.i];
+            let t = *self.tokens.get(&self.i).unwrap_or(&0);
             let opcode = t % 100;
             let a_mode = self.mode((t / 100) % 10);
             let b_mode = self.mode((t / 1000) % 10);
@@ -133,7 +132,7 @@ impl Program {
                     self.op(a_mode, b_mode, |a, b| a * b);
                 }
                 3 => {
-                    let a = a_mode(self, 1) as usize;
+                    let a = a_mode(self, 1) as i128;
                     let i = self.inputs.pop_front().unwrap();
                     self.store(a, i);
                     self.i += 2;
@@ -166,7 +165,7 @@ impl Program {
                     return;
                 }
                 _ => {
-                    println!("Oops: {} {}", self.i, self.tokens[self.i]);
+                    println!("Oops: {} {}", self.i, self.tokens[&self.i]);
                 }
             }
         }
