@@ -1,47 +1,72 @@
-use itertools::Itertools;
 use std::fs;
-use std::i32;
+use std::i128;
 use std::collections::VecDeque;
 
-fn parse(s: &str) -> i32 {
+fn parse(s: &str) -> i128 {
     s.trim().parse().unwrap()
 }
 
 
 struct Program {
-    orig: Vec<i32>,
-    tokens: Vec<i32>,
-    inputs: VecDeque<i32>,
-    output: i32,
+    orig: Vec<i128>,
+    tokens: Vec<i128>,
+    inputs: VecDeque<i128>,
+    output: i128,
     i: usize,
+    rb: i128,
     halted: bool,
 }
 
 impl Program {
-    fn new(t: &Vec<i32>) -> Program {
+    fn new(t: &Vec<i128>) -> Program {
         Program {
             orig: t.to_vec(),
             tokens: t.to_vec(),
             inputs: VecDeque::new(),
-            output: i32::MIN,
+            output: i128::MIN,
             i: 0,
+            rb : 0,
             halted: false,
         }
     }
 
-    fn position(&self, o: usize) -> i32 {
-        self.tokens[self.tokens[self.i+o] as usize] as i32
+    fn position(&mut self, o: usize) -> i128 {
+        if self.i+o >= self.tokens.len() {
+            self.tokens.resize(self.i+o+1, 0);
+        }
+        let i = self.tokens[self.i+o] as usize;
+        if i >= self.tokens.len() {
+            self.tokens.resize(i+1, 0);
+        }
+         
+        self.tokens[self.tokens[self.i+o] as usize]
     }
 
-    fn immediate(&self, o: usize) -> i32 {
-        self.tokens[self.i+o] as i32
+    fn immediate(&mut self, o: usize) -> i128 {
+        if self.i+o >= self.tokens.len() {
+            self.tokens.resize(self.i+o+1,0);
+        }
+        self.tokens[self.i+o]
     }
 
-    fn relative(&self, o: usize) -> i32 {
-        0
+    fn relative(&mut self, o: usize) -> i128 {
+        println!("Relative o: {}", o);
+        if self.i+o >= self.tokens.len() {
+            self.tokens.resize(self.i+o+1, 0);
+        }
+        println!("Relative self.i+o: {}", self.i+o);
+        println!("Relative toknes[self.i+o]: {}", self.tokens[self.i+o]);
+        let i = (self.tokens[self.i+o] + self.rb) as usize;
+        if i >= self.tokens.len() {
+            self.tokens.resize(i+1, 0);
+        }
+        println!("Relative - i: {}", i);
+        println!("Relative - tokens[i]: {}", self.tokens[i]);
+         
+        self.tokens[i]
     }
 
-    fn mode(&self, m: i32) -> fn(&Program, usize) -> i32 {
+    fn mode(&self, m: i128) -> fn(&mut Program, usize) -> i128 {
         match m {
             0 => Program::position,
             1 => Program::immediate,
@@ -53,29 +78,37 @@ impl Program {
     fn reset(&mut self) {
         self.tokens = self.orig.to_vec();
         self.i = 0;
+        self.rb = 0;
         self.inputs = VecDeque::new();
-        self.output = i32::MIN;
+        self.output = i128::MIN;
         self.halted = false;
+    }
+
+    fn store(&mut self, i: usize, x: i128) {
+        if i >= self.tokens.len() {
+            self.tokens.resize(i+1, 0);
+        }
+        self.tokens[i] = x;
     }
 
     fn op(
         &mut self,
-        a_mode: fn(&Program, usize) -> i32,
-        b_mode: fn(&Program, usize) -> i32,
-        o: fn(a: i32, b: i32) -> i32,
+        a_mode: fn(&mut Program, usize) -> i128,
+        b_mode: fn(&mut Program, usize) -> i128,
+        o: fn(a: i128, b: i128) -> i128,
     ) {
         let a = a_mode(self, 1);
         let b = b_mode(self, 2);
-        let c = self.tokens[self.i + 3] as usize;
-        self.tokens[c] = o(a, b);
+        let c = self.immediate(3) as usize;
+        self.store(c, o(a,b));
         self.i += 4;
     }
 
     fn branch(
         &mut self,
-        a_mode: fn(&Program, usize) -> i32,
-        b_mode: fn(&Program, usize) -> i32,
-        o: fn(a: i32) -> bool,
+        a_mode: fn(&mut Program, usize) -> i128,
+        b_mode: fn(&mut Program, usize) -> i128,
+        o: fn(a: i128) -> bool,
     ) {
         let a = a_mode(self, 1);
         let b = b_mode(self, 2);
@@ -87,17 +120,17 @@ impl Program {
     }
     fn test(
         &mut self,
-        a_mode: fn(&Program, usize) -> i32,
-        b_mode: fn(&Program, usize) -> i32,
-        o: fn(a: i32, b: i32) -> bool,
+        a_mode: fn(&mut Program, usize) -> i128,
+        b_mode: fn(&mut Program, usize) -> i128,
+        o: fn(a: i128, b: i128) -> bool,
     ) {
         let a = a_mode(self, 1);
         let b = b_mode(self, 2);
-        let c = self.tokens[self.i + 3] as usize;
+        let c = self.immediate(3) as usize;
         if o(a, b) {
-            self.tokens[c] = 1;
+            self.store(c, 1);
         } else {
-            self.tokens[c] = 0;
+            self.store(c, 0);
         }
         self.i += 4;
     }
@@ -108,8 +141,7 @@ impl Program {
             let opcode = t % 100;
             let a_mode = self.mode((t / 100) % 10);
             let b_mode = self.mode((t / 1000) % 10);
-
-            //        println!("a_mode = {}, t = {}, opcode = {}", (t / 100) % 10, t, opcode);
+            println!("rb = {}, a_mode = {}, b_mode = {}, t = {}, opcode = {}", self.rb, (t / 100) % 10, (t / 1000) % 10, t, opcode);
 
             match opcode {
                 1 => {
@@ -119,8 +151,10 @@ impl Program {
                     self.op(a_mode, b_mode, |a, b| a * b);
                 }
                 3 => {
-                    let a = self.immediate(1) as usize;
-                    self.tokens[a] = self.inputs.pop_front().unwrap();
+                    let a = a_mode(self, 1) as usize;
+                    let i = self.inputs.pop_front().unwrap();
+                    println!("{}, {}, {}", self.i, a, i);
+                    self.store(a, i);
                     self.i += 2;
                 }
                 4 => {
@@ -140,6 +174,10 @@ impl Program {
                 8 => {
                     self.test(a_mode, b_mode, |a, b| a == b);
                 }
+                9 => {
+                    self.rb += a_mode(self, 1);
+                    self.i += 2;
+                }
                 99 => {
                     //println!("Halt!");
                     self.halted = true;
@@ -153,60 +191,28 @@ impl Program {
     }
 }
 
-fn run(programs: &mut Vec<Program>, order: &Vec<i32>) -> i32 {
-    programs.iter_mut().for_each(|x|x.reset());
-    for (x,p) in order.iter().zip(programs.iter_mut()) {
-        p.inputs.push_back(*x);
-    }
-
-    //println!("Order:{:?}", order);
-    let mut output = 0;
-    let mut i = 0;
-    while !programs.iter().any(|x|x.halted) {
-        i += 1;
-        if i > 10000 {
-            panic!("Loops");
+fn one(t: &Vec<i128>) -> Vec<i128> {
+    let mut p = Program::new(t);
+    let mut output = Vec::new();
+    p.inputs.push_back(1);
+    loop {
+        p.intcode();
+        if p.halted {
+            break;
         }
-        for p in programs.iter_mut() {
-            p.inputs.push_back(output);
-            p.intcode();
-            output = p.output;
-        }
+        output.push(p.output);
     }
-    //println!("Order:{:?}={}", order, output);
-    output
-}
-
-fn one(t: &Vec<i32>) -> i32 {
-    let mut programs:Vec<Program> = Vec::new();
-
-    for _ in 0..5 {
-        programs.push(Program::new(t));
-    }
-
-    (0..=4).permutations(5).map(|x| run(&mut programs, &x)).max().unwrap()
-}
-
-fn two(t: &Vec<i32>) -> i32 {
-    let mut programs:Vec<Program> = Vec::new();
-
-    for _ in 0..5 {
-        programs.push(Program::new(t));
-    }
-
-    (5..=9).permutations(5).map(|x| run(&mut programs, &x)).max().unwrap()
+    output 
 }
 
 fn main() {
-    let tokens: Vec<i32> = fs::read_to_string("day7.txt")
+    let tokens: Vec<i128> = fs::read_to_string("day9.txt")
         .unwrap()
         .split(",")
         .map(parse)
         .collect();
     let ret = one(&tokens);
-    println!("one = {}", ret);
-    let ret = two(&tokens);
-    println!("two = {}", ret);
+    println!("one = {:?}", ret);
 }
 
 #[cfg(test)]
@@ -216,51 +222,41 @@ mod tests {
     #[test]
     fn test_one_1() {
         let input = vec![
-            3, 15, 3, 16, 1002, 16, 10, 16, 1, 16, 15, 15, 4, 15, 99, 0, 0,
+            109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99
         ];
-        let ret = one(&input);
+        let mut p = Program::new(&input);
+        let mut output = Vec::new();
 
-        assert_eq!(43210, ret);
+        loop {
+            p.intcode();
+            if p.halted {
+                break;
+            }
+            output.push(p.output);
+        }
+
+        assert_eq!(input, output);
     }
     #[test]
     fn test_one_2() {
         let input = vec![
-            3, 23, 3, 24, 1002, 24, 10, 24, 1002, 23, -1, 23, 101, 5, 23, 23, 1, 24, 23, 23, 4, 23,
-            99, 0, 0,
+            1102,34915192,34915192,7,4,7,99,0
         ];
-        let ret = one(&input);
+        let mut p = Program::new(&input);
+        p.intcode();
+        let ret = p.output;
 
-        assert_eq!(54321, ret);
+        assert_eq!(16, format!("{}", ret).len());
     }
     #[test]
     fn test_one_3() {
         let input = vec![
-            3, 31, 3, 32, 1002, 32, 10, 32, 1001, 31, -2, 31, 1007, 31, 0, 33, 1002, 33, 7, 33, 1,
-            33, 31, 31, 1, 32, 31, 31, 4, 31, 99, 0, 0, 0,
+            104,1125899906842624,99
         ];
-        let ret = one(&input);
+        let mut p = Program::new(&input);
+        p.intcode();
+        let ret = p.output;
 
-        assert_eq!(65210, ret);
-    }
-    #[test]
-    fn test_two_1() {
-        let input = vec![
-            3, 26, 1001, 26, -4, 26, 3, 27, 1002, 27, 2, 27, 1, 27, 26, 27, 4, 27, 1001, 28, -1,
-            28, 1005, 28, 6, 99, 0, 0, 5,
-        ];
-        let ret = two(&input);
-
-        assert_eq!(139629729, ret);
-    }
-    #[test]
-    fn test_two_2() {
-        let input = vec![
-            3, 52, 1001, 52, -5, 52, 3, 53, 1, 52, 56, 54, 1007, 54, 5, 55, 1005, 55, 26, 1001, 54,
-            -5, 54, 1105, 1, 12, 1, 53, 54, 53, 1008, 54, 0, 55, 1001, 55, 1, 55, 2, 53, 55, 53, 4,
-            53, 1001, 56, -1, 56, 1005, 56, 6, 99, 0, 0, 0, 0, 10,
-        ];
-        let ret = two(&input);
-
-        assert_eq!(18216, ret);
+        assert_eq!(1125899906842624, ret);
     }
 }
