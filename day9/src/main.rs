@@ -173,10 +173,11 @@ impl Program {
     }
 }
 
-fn one(t: &Vec<i128>) -> Vec<i128> {
+
+fn run(t: &Vec<i128>, i: i128) -> Vec<i128> {
     let mut p = Program::new(t);
     let mut output = Vec::new();
-    p.inputs.push_back(2);
+    p.inputs.push_back(i);
     loop {
         p.intcode();
         if p.halted {
@@ -187,6 +188,14 @@ fn one(t: &Vec<i128>) -> Vec<i128> {
     output 
 }
 
+fn one(t: &Vec<i128>) -> Vec<i128> {
+    run(t, 1)
+}
+
+fn two(t: &Vec<i128>) -> Vec<i128> {
+    run(t, 2)
+}
+
 fn main() {
     let tokens: Vec<i128> = fs::read_to_string("day9.txt")
         .unwrap()
@@ -195,6 +204,8 @@ fn main() {
         .collect();
     let ret = one(&tokens);
     println!("one = {:?}", ret);
+    let ret = two(&tokens);
+    println!("two = {:?}", ret);
 }
 
 #[cfg(test)]
