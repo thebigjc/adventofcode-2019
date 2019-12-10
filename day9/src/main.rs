@@ -31,39 +31,20 @@ impl Program {
     }
 
     fn position(&mut self, o: usize) -> i128 {
-        if self.i+o >= self.tokens.len() {
-            self.tokens.resize(self.i+o+1, 0);
-        }
-        let i = self.tokens[self.i+o] as usize;
-        if i >= self.tokens.len() {
-            self.tokens.resize(i+1, 0);
-        }
+        let i = *self.tokens.get(self.i+o).unwrap_or(&0) as usize;
          
-        self.tokens[self.tokens[self.i+o] as usize]
+        *self.tokens.get(i).unwrap_or(&0)
     }
 
     fn immediate(&mut self, o: usize) -> i128 {
-        if self.i+o >= self.tokens.len() {
-            self.tokens.resize(self.i+o+1,0);
-        }
-        self.tokens[self.i+o]
+        *self.tokens.get(self.i+o).unwrap_or(&0)
     }
 
     fn relative(&mut self, o: usize) -> i128 {
-        println!("Relative o: {}", o);
-        if self.i+o >= self.tokens.len() {
-            self.tokens.resize(self.i+o+1, 0);
-        }
-        println!("Relative self.i+o: {}", self.i+o);
-        println!("Relative toknes[self.i+o]: {}", self.tokens[self.i+o]);
-        let i = (self.tokens[self.i+o] + self.rb) as usize;
-        if i >= self.tokens.len() {
-            self.tokens.resize(i+1, 0);
-        }
-        println!("Relative - i: {}", i);
-        println!("Relative - tokens[i]: {}", self.tokens[i]);
+        let pos = self.tokens.get(self.i+o).unwrap_or(&0);
+        let i = (self.rb + pos) as usize;
          
-        self.tokens[i]
+        *self.tokens.get(i).unwrap_or(&0)
     }
 
     fn mode(&self, m: i128) -> fn(&mut Program, usize) -> i128 {
@@ -88,6 +69,7 @@ impl Program {
         if i >= self.tokens.len() {
             self.tokens.resize(i+1, 0);
         }
+        println!("Store: {} = {}", i, x);
         self.tokens[i] = x;
     }
 
@@ -153,7 +135,6 @@ impl Program {
                 3 => {
                     let a = a_mode(self, 1) as usize;
                     let i = self.inputs.pop_front().unwrap();
-                    println!("{}, {}, {}", self.i, a, i);
                     self.store(a, i);
                     self.i += 2;
                 }
@@ -175,7 +156,8 @@ impl Program {
                     self.test(a_mode, b_mode, |a, b| a == b);
                 }
                 9 => {
-                    self.rb += a_mode(self, 1);
+                    let x = a_mode(self, 1);
+                    self.rb += x;
                     self.i += 2;
                 }
                 99 => {
