@@ -32,24 +32,24 @@ impl Program {
         }
     }
 
-    fn position(&mut self, o: i128) -> i128 {
+    fn position(&self, o: i128) -> i128 {
         let i = *self.tokens.get(&(self.i+o)).unwrap_or(&0); 
          
         *self.tokens.get(&i).unwrap_or(&0)
     }
 
-    fn immediate(&mut self, o: i128) -> i128 {
+    fn immediate(&self, o: i128) -> i128 {
         *self.tokens.get(&(self.i+o)).unwrap_or(&0)
     }
 
-    fn relative(&mut self, o: i128) -> i128 {
+    fn relative(&self, o: i128) -> i128 {
         let pos = self.tokens.get(&(self.i+o)).unwrap_or(&0);
         let i = (self.rb + pos) as i128;
          
         *self.tokens.get(&i).unwrap_or(&0)
     }
 
-    fn mode(&self, m: i128) -> fn(&mut Program, i128) -> i128 {
+    fn mode(&self, m: i128) -> fn(&Program, i128) -> i128 {
         match m {
             0 => Program::position,
             1 => Program::immediate,
@@ -74,8 +74,8 @@ impl Program {
 
     fn op(
         &mut self,
-        a_mode: fn(&mut Program, i128) -> i128,
-        b_mode: fn(&mut Program, i128) -> i128,
+        a_mode: fn(&Program, i128) -> i128,
+        b_mode: fn(&Program, i128) -> i128,
         o: fn(a: i128, b: i128) -> i128,
     ) {
         let a = a_mode(self, 1);
@@ -87,8 +87,8 @@ impl Program {
 
     fn branch(
         &mut self,
-        a_mode: fn(&mut Program, i128) -> i128,
-        b_mode: fn(&mut Program, i128) -> i128,
+        a_mode: fn(&Program, i128) -> i128,
+        b_mode: fn(&Program, i128) -> i128,
         o: fn(a: i128) -> bool,
     ) {
         let a = a_mode(self, 1);
@@ -101,8 +101,8 @@ impl Program {
     }
     fn test(
         &mut self,
-        a_mode: fn(&mut Program, i128) -> i128,
-        b_mode: fn(&mut Program, i128) -> i128,
+        a_mode: fn(&Program, i128) -> i128,
+        b_mode: fn(&Program, i128) -> i128,
         o: fn(a: i128, b: i128) -> bool,
     ) {
         let a = a_mode(self, 1);
