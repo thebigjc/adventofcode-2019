@@ -159,6 +159,7 @@ impl Program {
                     self.i += 2;
                 }
                 99 => {
+                    println!("Halt!");
                     self.halted = true;
                     return;
                 }
@@ -185,13 +186,13 @@ fn one(t: &Vec<i128>) -> usize {
         println!("At {}, {}, painted = {}", x, y, c);
         p.inputs.push_back(c);
         p.intcode();
+        if p.halted {
+            break;
+        }
         let color = p.output;
         println!("Painting {}", color);
         colors.insert((x,y), color);
         p.intcode();
-        if p.halted {
-            break;
-        }
         let dir = p.output;
         println!("Turning {}", dir);
         let (dx1, dy1) = match dir {
