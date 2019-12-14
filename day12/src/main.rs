@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::fs;
+use num::integer::lcm;
 
 #[macro_use]
 extern crate scan_fmt;
@@ -17,7 +18,6 @@ struct Planet {
 
 impl Planet {
     fn energy(&self) -> u32 {
-        println!("{:?}", self);
         self.potential() * self.kinetic()
     }
     fn potential(&self) -> u32 {
@@ -71,13 +71,49 @@ fn calc_energy(p: &Vec<Planet>) -> u32 {
 
 fn loop_planets(mut planets: &mut Vec<Planet>, i: usize) -> u32 {
     let mut energy = 0;
-    for n in 0..i {
-        println!("{}: {:?}", n, planets);
+    for _ in 0..i {
         do_gravity(&mut planets);
         do_velocity(&mut planets);
         energy = calc_energy(&planets);
     }
     energy
+}
+
+fn loop_planets_dupe(mut planets: &mut Vec<Planet>) -> u64 {
+    let mut cnt = 0;
+    let mut x_period = 0;
+    let mut y_period = 0;
+    let mut z_period = 0;
+
+    loop {
+        cnt += 1;
+        do_gravity(&mut planets);
+        if x_period == 0 {
+            let x_zero = planets.iter().all(|p|p.dx==0);
+            if x_zero {
+                x_period = cnt;
+            }
+        }
+        if y_period == 0 {
+            let y_zero = planets.iter().all(|p|p.dy==0);
+            if y_zero {
+                y_period = cnt;
+            }
+        }
+        if z_period == 0 {
+            let z_zero = planets.iter().all(|p|p.dz==0);
+            if z_zero {
+                z_period = cnt;
+            }
+        }
+        if vec![x_period,y_period,z_period].iter().all(|x|*x>0) {
+            break;
+        }
+
+        do_velocity(&mut planets);
+    }
+    println!("{},{},{}", x_period, y_period, z_period);
+    lcm(x_period, lcm(y_period, z_period)) * 2
 }
 
 fn main() {
@@ -100,20 +136,48 @@ fn main() {
 
     let energy = loop_planets(&mut planets, 1000);
     println!("{}", energy);
+    let cnt = loop_planets_dupe(&mut planets);
+    println!("{}", cnt);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_one_1() {
+    fn mk_planets() -> Vec<Planet>{
         let io = Planet{i:0,x:-1,y:0,z:2,dx:0,dy:0,dz:0};
         let europa = Planet{i:1,x:2,y:-10,z:-7,dx:0,dy:0,dz:0};
         let ganymede = Planet{i:2,x:4,y:-8,z:8,dx:0,dy:0,dz:0};
         let callisto = Planet{i:3,x:3,y:5,z:-1,dx:0,dy:0,dz:0};
-        let mut planets = vec![io, europa, ganymede, callisto];
+        let planets = vec![io, europa, ganymede, callisto];
+        planets
+    }
+
+    fn mk_planets_2() -> Vec<Planet>{
+        let io = Planet{i:0,x:-8,y:-10,z:0,dx:0,dy:0,dz:0};
+        let europa = Planet{i:1,x:5,y:5,z:10,dx:0,dy:0,dz:0};
+        let ganymede = Planet{i:2,x:2,y:-7,z:3,dx:0,dy:0,dz:0};
+        let callisto = Planet{i:3,x:9,y:-8,z:-3,dx:0,dy:0,dz:0};
+        let planets = vec![io, europa, ganymede, callisto];
+        planets
+    }
+
+    #[test]
+    fn test_one_1() {
+        let mut planets = mk_planets();
         let energy = loop_planets(&mut planets, 10);
         assert_eq!(179, energy);
+    }
+    #[test]
+    fn test_two_1() {
+        let mut planets = mk_planets();
+        let cnt = loop_planets_dupe(&mut planets);
+        assert_eq!(2772, cnt);
+    }
+    #[test]
+    fn test_two_2() {
+        let mut planets = mk_planets_2();
+        let cnt = loop_planets_dupe(&mut planets);
+        assert_eq!(4686774924, cnt);
     }
 }
