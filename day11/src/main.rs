@@ -2,7 +2,6 @@ use std::fs;
 use std::i128;
 use std::collections::VecDeque;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::iter::FromIterator;
 
 fn parse(s: &str) -> i128 {
@@ -175,13 +174,13 @@ impl Program {
 fn one(t: &Vec<i128>) -> usize {
     let mut p = Program::new(t);
     let mut dx = 0;
-    let mut dy = 1;
+    let mut dy = -1;
     let mut x = 0;
     let mut y = 0;
     let mut colors = HashMap::new();
-    let mut painted = HashSet::new();
 
     loop {
+        println!("{} painted, {} inputs", colors.len(), p.inputs.len());
         let c = *colors.get(&(x,y)).unwrap_or(&0);
         println!("At {}, {}, painted = {}", x, y, c);
         p.inputs.push_back(c);
@@ -189,28 +188,18 @@ fn one(t: &Vec<i128>) -> usize {
         let color = p.output;
         println!("Painting {}", color);
         colors.insert((x,y), color);
-        painted.insert((x,y));
         p.intcode();
+        if p.halted {
+            break;
+        }
         let dir = p.output;
         println!("Turning {}", dir);
         let (dx1, dy1) = match dir {
             0 => {
-                match (dx, dy) { 
-                    (0,1) => (-1, 0),
-                    (-1,0) => (0, -1),
-                    (0,-1) => (1, 0),
-                    (1,0) => (0, 1),
-                    _ => panic!("Unknown pattern"),
-                }
+                (dy, -dx)
             }
             1 => {
-                match (dx, dy) { 
-                    (0,1) => (1, 0),
-                    (-1,0) => (0, 1),
-                    (0,-1) => (1, 0),
-                    (1,0) => (0, -1),
-                    _ => panic!("Unknown pattern"),
-                }
+                (-dy, dx)
             },
             _ => panic!("Unknown dir")
         };
@@ -221,11 +210,8 @@ fn one(t: &Vec<i128>) -> usize {
         x += dx;
         y += dy;
 
-        if p.halted {
-            break;
-        }
     }
-    painted.len()
+    colors.len()
 }
 
 fn main() {
