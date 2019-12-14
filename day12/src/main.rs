@@ -1,39 +1,41 @@
 use std::cmp::Ordering;
 use std::fs;
-use num::integer::lcm;
 
 #[macro_use]
 extern crate scan_fmt;
 
 #[derive(Clone, Copy, Debug)]
 struct Planet {
-    i: usize,
-    x: i32,
-    y: i32,
-    z: i32,
-    dx: i32,
-    dy: i32,
-    dz: i32,
+    pos: [i64; 3],
+    vel: [i64; 3],
+}
+
+fn gcd(a: usize, b: usize) -> usize {
+    return if b == 0 { a } else { gcd(b, a % b) };
+}
+
+fn lcm(a: usize, b: usize) -> usize {
+    return a * b / gcd(a, b);
 }
 
 impl Planet {
-    fn energy(&self) -> u32 {
+    fn energy(&self) -> usize {
         self.potential() * self.kinetic()
     }
-    fn potential(&self) -> u32 {
-        (self.x.abs() + self.y.abs() + self.z.abs()) as u32
+    fn potential(&self) -> usize {
+        self.pos.iter().map(|x| x.abs()).sum::<i64>() as usize
     }
-    fn kinetic(&self) -> u32 {
-        (self.dx.abs() + self.dy.abs() + self.dz.abs()) as u32
+    fn kinetic(&self) -> usize {
+        self.vel.iter().map(|x| x.abs()).sum::<i64>() as usize
     }
     fn mv(&mut self) {
-        self.x += self.dx;
-        self.y += self.dy;
-        self.z += self.dz;
+        for i in 0..3 {
+            self.pos[i] += self.vel[i];
+        }
     }
 }
 
-fn do_delta(a: i32, b: i32) -> i32 {
+fn do_delta(a: i64, b: i64) -> i64 {
     match a.cmp(&b) {
         Ordering::Less => 1,
         Ordering::Equal => 0,
@@ -42,17 +44,12 @@ fn do_delta(a: i32, b: i32) -> i32 {
 }
 
 fn do_gravity(p: &mut Vec<Planet>) {
-    let bv = p.to_vec();
-    let ai = p.iter_mut();
-
-    for mut a in ai {
-        for b in &bv {
-            if a.i == b.i {
-                continue;
+    for i in 0..p.len() {
+        for j in i+1..p.len() {
+            for n in 0..3 {
+                p[i].vel[n] += do_delta(p[i].pos[n], p[j].pos[n]);
+                p[j].vel[n] += do_delta(p[j].pos[n], p[i].pos[n]);
             }
-            a.dx += do_delta(a.x, b.x);
-            a.dy += do_delta(a.y, b.y);
-            a.dz += do_delta(a.z, b.z);
         }
     }
 }
@@ -61,7 +58,7 @@ fn do_velocity(p: &mut Vec<Planet>) {
     p.iter_mut().for_each(|p| p.mv());
 }
 
-fn calc_energy(p: &Vec<Planet>) -> u32 {
+fn calc_energy(p: &Vec<Planet>) -> usize {
     let mut sum = 0;
     for pi in p {
         sum += pi.energy();
@@ -69,7 +66,7 @@ fn calc_energy(p: &Vec<Planet>) -> u32 {
     sum
 }
 
-fn loop_planets(mut planets: &mut Vec<Planet>, i: usize) -> u32 {
+fn loop_planets(mut planets: &mut Vec<Planet>, i: usize) -> usize {
     let mut energy = 0;
     for _ in 0..i {
         do_gravity(&mut planets);
@@ -79,41 +76,27 @@ fn loop_planets(mut planets: &mut Vec<Planet>, i: usize) -> u32 {
     energy
 }
 
-fn loop_planets_dupe(mut planets: &mut Vec<Planet>) -> u64 {
+fn loop_planets_dupe(mut planets: &mut Vec<Planet>) -> usize {
     let mut cnt = 0;
-    let mut x_period = 0;
-    let mut y_period = 0;
-    let mut z_period = 0;
+    let mut period: [usize; 3] = [0, 0, 0];
 
     loop {
         cnt += 1;
         do_gravity(&mut planets);
-        if x_period == 0 {
-            let x_zero = planets.iter().all(|p|p.dx==0);
-            if x_zero {
-                x_period = cnt;
+        for i in 0..3 {
+            if period[i] == 0 && planets.iter().all(|p| p.vel[i] == 0) {
+                println!("x[{}] = 0, cnt = {}", i, cnt);
+                period[i] = cnt;
             }
         }
-        if y_period == 0 {
-            let y_zero = planets.iter().all(|p|p.dy==0);
-            if y_zero {
-                y_period = cnt;
-            }
-        }
-        if z_period == 0 {
-            let z_zero = planets.iter().all(|p|p.dz==0);
-            if z_zero {
-                z_period = cnt;
-            }
-        }
-        if vec![x_period,y_period,z_period].iter().all(|x|*x>0) {
+        if period.iter().all(|x| *x > 0) {
             break;
         }
 
         do_velocity(&mut planets);
     }
-    println!("{},{},{}", x_period, y_period, z_period);
-    lcm(x_period, lcm(y_period, z_period)) * 2
+    println!("{:?}", period);
+    lcm(period[0], lcm(period[1], period[2])) * 2
 }
 
 fn main() {
@@ -121,16 +104,10 @@ fn main() {
 
     let mut planets: Vec<Planet> = input
         .lines()
-        .map(|x| scan_fmt!(x, "<x={d}, y={d}, z={d}>", i32, i32, i32).unwrap())
-        .enumerate()
-        .map(|(i, (x, y, z))| Planet {
-            i: i,
-            x: x,
-            y: y,
-            z: z,
-            dx: 0,
-            dy: 0,
-            dz: 0,
+        .map(|x| scan_fmt!(x, "<x={d}, y={d}, z={d}>", i64, i64, i64).unwrap())
+        .map(|(x, y, z)| Planet {
+            pos: [x, y, z],
+            vel: [0, 0, 0],
         })
         .collect();
 
@@ -144,20 +121,44 @@ fn main() {
 mod tests {
     use super::*;
 
-    fn mk_planets() -> Vec<Planet>{
-        let io = Planet{i:0,x:-1,y:0,z:2,dx:0,dy:0,dz:0};
-        let europa = Planet{i:1,x:2,y:-10,z:-7,dx:0,dy:0,dz:0};
-        let ganymede = Planet{i:2,x:4,y:-8,z:8,dx:0,dy:0,dz:0};
-        let callisto = Planet{i:3,x:3,y:5,z:-1,dx:0,dy:0,dz:0};
+    fn mk_planets() -> Vec<Planet> {
+        let io = Planet {
+            pos: [-1, 0, 2],
+            vel: [0, 0, 0],
+        };
+        let europa = Planet {
+            pos: [2, -10, -7],
+            vel: [0, 0, 0],
+        };
+        let ganymede = Planet {
+            pos: [4, -8, 8],
+            vel: [0, 0, 0],
+        };
+        let callisto = Planet {
+            pos: [3, 5, -1],
+            vel: [0, 0, 0],
+        };
         let planets = vec![io, europa, ganymede, callisto];
         planets
     }
 
-    fn mk_planets_2() -> Vec<Planet>{
-        let io = Planet{i:0,x:-8,y:-10,z:0,dx:0,dy:0,dz:0};
-        let europa = Planet{i:1,x:5,y:5,z:10,dx:0,dy:0,dz:0};
-        let ganymede = Planet{i:2,x:2,y:-7,z:3,dx:0,dy:0,dz:0};
-        let callisto = Planet{i:3,x:9,y:-8,z:-3,dx:0,dy:0,dz:0};
+    fn mk_planets_2() -> Vec<Planet> {
+        let io = Planet {
+            pos: [-8, -10, 0],
+            vel: [0, 0, 0],
+        };
+        let europa = Planet {
+            pos: [5, 5, 10],
+            vel: [0, 0, 0],
+        };
+        let ganymede = Planet {
+            pos: [2, -7, 3],
+            vel: [0, 0, 0],
+        };
+        let callisto = Planet {
+            pos: [9, -8, -3],
+            vel: [0, 0, 0],
+        };
         let planets = vec![io, europa, ganymede, callisto];
         planets
     }
