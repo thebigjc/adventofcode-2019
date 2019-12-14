@@ -63,21 +63,13 @@ fn one_two(s: &str) -> (usize, i32) {
         let dx = bx - ax;
         let dy = by - ay;
         let distance = ((dx * dx + dy * dy) as f32).sqrt();
-        let g = gcd(dx, dy);
-        let gdx = dx / g;
-        let gdy = dy / g;
-        let angle = (to_angle(gdx, gdy) - 90.0).rem_euclid(360.0);
-        println!("({}, {}), ({}, {}), {}, {},{} = {}", bx, by, ax, ay, g, gdx, gdy, angle);
-        let angle_i = (angle * 100.0).round() as i32;
+        let angle = (to_angle(dx, dy) - 90.0).rem_euclid(360.0);
+        let angle_i = (angle * 10.0).round() as i32;
         asteroids
             .entry(angle_i)
             .or_insert(Vec::new())
             .push((distance, a));
     }
-
-    asteroids
-        .values_mut()
-        .for_each(|x| x.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Equal)));
 
     let mut asteroids:Vec<(i32,Vec<(f32, (i32, i32))>)> = asteroids.iter().map(|(k,v)|(k.clone(),v.clone())).collect();
     asteroids.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Equal));
@@ -86,11 +78,10 @@ fn one_two(s: &str) -> (usize, i32) {
     let mut best_pos = 0;
 
     loop {
-        for (a, v) in asteroids.iter_mut() {
+        for (_, v) in asteroids.iter_mut() {
             if v.len() > 0 {
                 n += 1;
-                let (d, (x, y)) = v.pop().unwrap();
-                println!("{}, x={}, y={}, a={}, d={}", n, x, y, a, d);
+                let (_, (x, y)) = v.pop().unwrap();
                 if n == 200 {
                     best_pos = x * 100 + y;
                 }
