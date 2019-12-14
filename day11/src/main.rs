@@ -1,13 +1,16 @@
-use std::fs;
-use std::i128;
-use std::collections::VecDeque;
+use png;
 use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::fs;
+use std::fs::File;
+use std::i128;
+use std::io::BufWriter;
 use std::iter::FromIterator;
+use std::path::Path;
 
 fn parse(s: &str) -> i128 {
     s.trim().parse().unwrap()
 }
-
 
 struct Program {
     tokens: HashMap<i128, i128>,
@@ -21,29 +24,29 @@ struct Program {
 impl Program {
     fn new(t: &Vec<i128>) -> Program {
         Program {
-            tokens: HashMap::from_iter(t.iter().enumerate().map(|(a,b)|(a as i128, *b))),
+            tokens: HashMap::from_iter(t.iter().enumerate().map(|(a, b)| (a as i128, *b))),
             inputs: VecDeque::new(),
             output: i128::MIN,
             i: 0,
-            rb : 0,
+            rb: 0,
             halted: false,
         }
     }
 
     fn position(&self, o: i128) -> i128 {
-        let i = *self.tokens.get(&(self.i+o)).unwrap_or(&0); 
-         
+        let i = *self.tokens.get(&(self.i + o)).unwrap_or(&0);
+
         *self.tokens.get(&i).unwrap_or(&0)
     }
 
     fn immediate(&self, o: i128) -> i128 {
-        *self.tokens.get(&(self.i+o)).unwrap_or(&0)
+        *self.tokens.get(&(self.i + o)).unwrap_or(&0)
     }
 
     fn relative(&self, o: i128) -> i128 {
-        let pos = self.tokens.get(&(self.i+o)).unwrap_or(&0);
+        let pos = self.tokens.get(&(self.i + o)).unwrap_or(&0);
         let i = (self.rb + pos) as i128;
-         
+
         *self.tokens.get(&i).unwrap_or(&0)
     }
 
@@ -58,7 +61,7 @@ impl Program {
 
     fn store(&mut self, i: i128, x: i128) {
         //println!("Store: {} = {}", i, x);
-        self.tokens.insert(i,x);
+        self.tokens.insert(i, x);
     }
 
     fn op(
@@ -71,7 +74,7 @@ impl Program {
         let a = a_mode(self, 1);
         let b = b_mode(self, 2);
         let c = self.immediate(3) + rb;
-        self.store(c, o(a,b));
+        self.store(c, o(a, b));
         self.i += 4;
     }
 
@@ -171,8 +174,15 @@ impl Program {
     }
 }
 
-
 fn one(t: &Vec<i128>) -> usize {
+    paint(t, 0)
+}
+
+fn two(t: &Vec<i128>) -> usize {
+    paint(t, 1)
+}
+
+fn paint(t: &Vec<i128>, d: i128) -> usize {
     let mut p = Program::new(t);
     let mut dx = 0;
     let mut dy = -1;
@@ -181,37 +191,60 @@ fn one(t: &Vec<i128>) -> usize {
     let mut colors = HashMap::new();
 
     loop {
-        println!("{} painted, {} inputs", colors.len(), p.inputs.len());
-        let c = *colors.get(&(x,y)).unwrap_or(&0);
-        println!("At {}, {}, painted = {}", x, y, c);
+        let c = *colors.get(&(x, y)).unwrap_or(&d);
         p.inputs.push_back(c);
         p.intcode();
         if p.halted {
             break;
         }
         let color = p.output;
-        println!("Painting {}", color);
-        colors.insert((x,y), color);
+        colors.insert((x, y), color);
         p.intcode();
         let dir = p.output;
-        println!("Turning {}", dir);
         let (dx1, dy1) = match dir {
-            0 => {
-                (dy, -dx)
-            }
-            1 => {
-                (-dy, dx)
-            },
-            _ => panic!("Unknown dir")
+            0 => (dy, -dx),
+            1 => (-dy, dx),
+            _ => panic!("Unknown dir"),
         };
         dx = dx1;
         dy = dy1;
-        println!("Facing {},{}", dx, dy);
 
         x += dx;
         y += dy;
-
     }
+
+    if d == 1 {
+        let (minx, _) = colors.keys().min_by_key(|x| x.0).unwrap();
+        let (_, miny) = colors.keys().min_by_key(|x| x.1).unwrap();
+        let (maxx, _) = colors.keys().max_by_key(|x| x.0).unwrap();
+        let (_, maxy) = colors.keys().max_by_key(|x| x.1).unwrap();
+        println!("{}-{},{}-{}", minx, maxx, miny, maxy);
+
+        let path = Path::new(r"day11.png");
+        let file = File::create(path).unwrap();
+        let ref mut w = BufWriter::new(file);
+
+        let width = maxx - minx + 1;
+        let height = maxy - miny + 1;
+
+        let mut encoder = png::Encoder::new(w, width as u32, height as u32);
+        encoder.set_color(png::ColorType::Grayscale);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+        let mut data: Vec<u8> = Vec::new();
+        for y in *miny..=*maxy {
+            for x in *minx..=*maxx {
+                let c = *colors.get(&(x, y)).unwrap_or(&d);
+                data.push(match c {
+                    0 => 0,
+                    1 => 255,
+                    _ => panic!("bad color"),
+                });
+            }
+        }
+        writer.write_image_data(&data).unwrap();
+    }
+
     colors.len()
 }
 
@@ -223,6 +256,8 @@ fn main() {
         .collect();
     let ret = one(&tokens);
     println!("one = {:?}", ret);
+    let ret = two(&tokens);
+    println!("two = {:?}", ret);
 }
 
 #[cfg(test)]
@@ -232,7 +267,7 @@ mod tests {
     #[test]
     fn test_one_1() {
         let input = vec![
-            109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99
+            109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
         ];
         let mut p = Program::new(&input);
         let mut output = Vec::new();
@@ -249,9 +284,7 @@ mod tests {
     }
     #[test]
     fn test_one_2() {
-        let input = vec![
-            1102,34915192,34915192,7,4,7,99,0
-        ];
+        let input = vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0];
         let mut p = Program::new(&input);
         p.intcode();
         let ret = p.output;
@@ -260,9 +293,7 @@ mod tests {
     }
     #[test]
     fn test_one_3() {
-        let input = vec![
-            104,1125899906842624,99
-        ];
+        let input = vec![104, 1125899906842624, 99];
         let mut p = Program::new(&input);
         p.intcode();
         let ret = p.output;
@@ -271,9 +302,7 @@ mod tests {
     }
     #[test]
     fn test_one_4() {
-        let input = vec![
-            109, 1, 203, 2, 204, 2, 99
-        ];
+        let input = vec![109, 1, 203, 2, 204, 2, 99];
         let mut p = Program::new(&input);
         p.inputs.push_back(1024);
         p.intcode();
