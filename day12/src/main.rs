@@ -1,5 +1,5 @@
-use std::cmp::Ordering;
 use std::fs;
+use std::cmp::Ordering;
 
 #[macro_use]
 extern crate scan_fmt;
@@ -47,8 +47,9 @@ fn do_gravity(p: &mut Vec<Planet>) {
     for i in 0..p.len() {
         for j in i+1..p.len() {
             for n in 0..3 {
-                p[i].vel[n] += do_delta(p[i].pos[n], p[j].pos[n]);
-                p[j].vel[n] += do_delta(p[j].pos[n], p[i].pos[n]);
+                let delta = do_delta(p[i].pos[n], p[j].pos[n]);
+                p[i].vel[n] += delta;
+                p[j].vel[n] -= delta;
             }
         }
     }
@@ -66,25 +67,27 @@ fn calc_energy(p: &Vec<Planet>) -> usize {
     sum
 }
 
-fn loop_planets(mut planets: &mut Vec<Planet>, i: usize) -> usize {
+fn loop_planets(planets: &Vec<Planet>, i: usize) -> usize {
+    let mut my_planets = planets.to_vec();
     let mut energy = 0;
     for _ in 0..i {
-        do_gravity(&mut planets);
-        do_velocity(&mut planets);
-        energy = calc_energy(&planets);
+        do_gravity(&mut my_planets);
+        do_velocity(&mut my_planets);
+        energy = calc_energy(&my_planets);
     }
     energy
 }
 
-fn loop_planets_dupe(mut planets: &mut Vec<Planet>) -> usize {
+fn loop_planets_dupe(planets: &Vec<Planet>) -> usize {
     let mut cnt = 0;
     let mut period: [usize; 3] = [0, 0, 0];
+    let mut my_planets = planets.to_vec();
 
     loop {
         cnt += 1;
-        do_gravity(&mut planets);
+        do_gravity(&mut my_planets);
         for i in 0..3 {
-            if period[i] == 0 && planets.iter().all(|p| p.vel[i] == 0) {
+            if period[i] == 0 && my_planets.iter().map(|p| p.vel[i].abs()).sum::<i64>() == 0 {
                 println!("x[{}] = 0, cnt = {}", i, cnt);
                 period[i] = cnt;
             }
@@ -93,7 +96,7 @@ fn loop_planets_dupe(mut planets: &mut Vec<Planet>) -> usize {
             break;
         }
 
-        do_velocity(&mut planets);
+        do_velocity(&mut my_planets);
     }
     println!("{:?}", period);
     lcm(period[0], lcm(period[1], period[2])) * 2
@@ -102,7 +105,7 @@ fn loop_planets_dupe(mut planets: &mut Vec<Planet>) -> usize {
 fn main() {
     let input = fs::read_to_string("day12.txt").unwrap();
 
-    let mut planets: Vec<Planet> = input
+    let planets: Vec<Planet> = input
         .lines()
         .map(|x| scan_fmt!(x, "<x={d}, y={d}, z={d}>", i64, i64, i64).unwrap())
         .map(|(x, y, z)| Planet {
@@ -111,9 +114,9 @@ fn main() {
         })
         .collect();
 
-    let energy = loop_planets(&mut planets, 1000);
+    let energy = loop_planets(&planets, 1000);
     println!("{}", energy);
-    let cnt = loop_planets_dupe(&mut planets);
+    let cnt = loop_planets_dupe(&planets);
     println!("{}", cnt);
 }
 
